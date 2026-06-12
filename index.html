@@ -134,6 +134,53 @@
   .trophy-shelf .shelf-label { font-size: 16px; font-weight: 700; color: var(--ink); }
   .trophy-shelf .locked { filter: grayscale(1); opacity: .35; }
 
+  .gem-cave-btn {
+    border: none; cursor: pointer; font-family: inherit;
+    background: linear-gradient(180deg, #6b54a8, #43326f); color: #fff;
+    font-size: 20px; font-weight: 700; padding: 12px 30px; border-radius: 999px;
+    box-shadow: 0 6px 0 rgba(0,0,0,.25), 0 0 18px rgba(176,106,255,.45);
+    transition: transform .12s ease;
+  }
+  .gem-cave-btn:hover { transform: scale(1.06) rotate(-1deg); }
+  .gem-cave-btn:active { transform: translateY(3px); }
+
+  /* ---------- gem cave screen ---------- */
+  #gemcave {
+    justify-content: center; gap: 20px;
+    background: radial-gradient(ellipse at 50% 130%, #4a3a78 0%, #241c45 55%, #151031 100%);
+  }
+  #gemcave h2 {
+    color: #fff; font-size: clamp(32px, 6vw, 52px); font-weight: 800;
+    text-shadow: 0 4px 0 rgba(0,0,0,.35), 0 0 24px rgba(176,106,255,.5);
+  }
+  .gem-grid { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; max-width: 780px; }
+  .gem-card {
+    width: 150px; padding: 18px 10px 14px; border-radius: 22px; text-align: center;
+    background: rgba(255,255,255,.07); border: 2px solid rgba(255,255,255,.16);
+  }
+  .gem-card .gem-emoji {
+    font-size: 54px; display: block;
+    filter: drop-shadow(0 0 14px rgba(255,255,255,.5));
+    animation: gemTwinkle 2.6s ease-in-out infinite;
+  }
+  @keyframes gemTwinkle { 0%,100% { transform: scale(1);} 50% { transform: scale(1.08) rotate(3deg);} }
+  .gem-card.none .gem-emoji { filter: grayscale(1) brightness(.35); animation: none; }
+  .gem-card .gem-name { color: #fff; font-weight: 700; font-size: 17px; margin-top: 6px; display: block; }
+  .gem-card .gem-count { color: #cfc4f5; font-weight: 700; font-size: 14px; }
+  .gem-card.tier-rare { border-color: rgba(255,138,194,.7); }
+  .gem-card.tier-legendary { border-color: rgba(255,225,77,.8); box-shadow: 0 0 20px rgba(255,225,77,.3); }
+
+  /* gem found toast */
+  #gemToast {
+    position: fixed; top: 14%; left: 50%; transform: translateX(-50%) scale(0); z-index: 70;
+    background: linear-gradient(180deg, #fffdf2, #ffeccf); color: var(--ink);
+    border-radius: 24px; padding: 12px 30px; font-size: 26px; font-weight: 800;
+    box-shadow: 0 12px 30px rgba(0,0,0,.3); pointer-events: none; white-space: nowrap;
+    transition: transform .25s cubic-bezier(.5,1.8,.5,1);
+  }
+  #gemToast.show { transform: translateX(-50%) scale(1); }
+  #gemToast .toast-gem { font-size: 34px; vertical-align: -4px; }
+
   /* ---------- HUD ---------- */
   .hud {
     width: 100%; max-width: 980px; display: flex; align-items: center;
@@ -348,7 +395,15 @@
       <span class="mode-hint">Spell the picture all by yourself</span>
     </button>
   </div>
+  <button class="gem-cave-btn" id="gemCaveBtn">💎 My Gem Cave</button>
   <div class="trophy-shelf" id="trophyShelf"></div>
+</div>
+
+<!-- ============ GEM CAVE ============ -->
+<div class="screen" id="gemcave">
+  <h2>💎 Rylan's Gem Cave 💎</h2>
+  <div class="gem-grid" id="gemGrid"></div>
+  <button class="hud-btn" id="gemBackBtn">⬅ Back</button>
 </div>
 
 <!-- ============ GAME ============ -->
@@ -359,6 +414,7 @@
     <div style="display:flex; gap:10px; align-items:center;">
       <div class="streak-pill" id="streakPill">🔥 0</div>
       <button class="hud-btn hint" id="hintBtn" style="display:none;">💡 Hint</button>
+      <div class="star-pill">💎<span id="gemCount">0</span></div>
       <div class="star-pill"><span class="star-icon">⭐</span><span id="starCount">0</span></div>
     </div>
   </div>
@@ -378,6 +434,7 @@
   </div>
 </div>
 
+<div id="gemToast"></div>
 <div id="fx"></div>
 
 <script>
@@ -396,7 +453,23 @@ const WORDS_MED = [
   ['LION','🦁'], ['BEAR','🐻'], ['CORN','🌽'], ['KITE','🪁'], ['RAIN','🌧️'],
   ['SOCK','🧦'], ['BIRD','🐦'], ['CRAB','🦀'], ['DRUM','🥁'], ['SHIP','🚢'],
 ];
+const WORDS_PERSONAL = [
+  ['RYLAN','🧒'], ['MOM','👩'], ['DAD','👨'], ['GEM','💎'],
+];
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+// [key, emoji, name, tier]
+const GEMS = [
+  ['pearl',    '⚪', 'PEARL',    'common'],
+  ['topaz',    '🔶', 'TOPAZ',    'common'],
+  ['emerald',  '🟢', 'EMERALD',  'common'],
+  ['sapphire', '🔷', 'SAPPHIRE', 'uncommon'],
+  ['amethyst', '🟣', 'AMETHYST', 'uncommon'],
+  ['ruby',     '♦️', 'RUBY',     'rare'],
+  ['diamond',  '💎', 'DIAMOND',  'rare'],
+  ['rainbow',  '🌈', 'RAINBOW GEM', 'legendary'],
+];
+const TIER_ORDER = ['common', 'uncommon', 'rare', 'legendary'];
+const TIER_WEIGHTS = { common: 55, uncommon: 28, rare: 13, legendary: 4 };
 const BALLOON_COLORS = ['#ff5fa2','#ffb340','#5fd86b','#4aa8ff','#b06aff','#ff7043','#2bc7b9'];
 const ROUND_LENGTH = 8;
 const TROPHIES = [
@@ -406,6 +479,7 @@ const PRAISE = ['GREAT JOB!','AWESOME!','SUPER STAR!','YOU ROCK!','FANTASTIC!','
 
 /* ================= state ================= */
 let stars = Number(localStorage.getItem('tq_stars') || 0);
+let gems = JSON.parse(localStorage.getItem('tq_gems') || '{}');
 let mode = null;          // 'pop' | 'build' | 'spell'
 let target = '';          // current word or letter
 let pos = 0;              // index into target
@@ -441,6 +515,7 @@ const sndWrong = () => { tone(220, 0, 0.15, 'square', 0.07); tone(180, 0.1, 0.2,
 const sndPop   = () => { tone(880, 0, 0.07, 'triangle', 0.2); tone(1320, 0.05, 0.12, 'sine', 0.15); };
 const sndWord  = () => { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.09, 0.18, 'triangle', 0.16)); };
 const sndFanfare = () => { [523,659,784,1047,784,1047,1319].forEach((f,i)=>tone(f, i*0.12, 0.22, 'triangle', 0.17)); };
+const sndGem = () => { [1047,1319,1568,2093].forEach((f,i)=>tone(f, i*0.06, 0.14, 'sine', 0.14)); };
 
 /* ================= speech ================= */
 let voice = null;
@@ -510,6 +585,55 @@ function addStar(x, y) {
   $('starCount').textContent = stars;
   if (x !== undefined) floatStar(x, y);
 }
+/* ================= gems ================= */
+function gemTotal() {
+  return Object.values(gems).reduce((s, n) => s + n, 0);
+}
+function rollGem(luck = 1) {
+  const entries = TIER_ORDER.map(t =>
+    [t, (t === 'rare' || t === 'legendary') ? TIER_WEIGHTS[t] * luck : TIER_WEIGHTS[t]]);
+  let r = Math.random() * entries.reduce((s, [, w]) => s + w, 0);
+  let tier = 'common';
+  for (const [t, w] of entries) { if ((r -= w) < 0) { tier = t; break; } }
+  const opts = GEMS.filter(g => g[3] === tier);
+  return opts[Math.floor(Math.random() * opts.length)];
+}
+function awardGem(x, y, luck = 1, minTier = null) {
+  let gem = rollGem(luck);
+  let guard = 0;
+  while (minTier && TIER_ORDER.indexOf(gem[3]) < TIER_ORDER.indexOf(minTier) && guard++ < 50) {
+    gem = rollGem(luck * 2);
+  }
+  const [key, emoji, name, tier] = gem;
+  gems[key] = (gems[key] || 0) + 1;
+  localStorage.setItem('tq_gems', JSON.stringify(gems));
+  $('gemCount').textContent = gemTotal();
+  const toast = $('gemToast');
+  toast.innerHTML = `<span class="toast-gem">${emoji}</span> You found a ${name}!`;
+  toast.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => toast.classList.remove('show'), 1700);
+  sndGem();
+  if (x !== undefined) {
+    const s = document.createElement('div');
+    s.className = 'float-star'; s.textContent = emoji;
+    s.style.left = (x - 17) + 'px'; s.style.top = (y - 17) + 'px';
+    fx.appendChild(s);
+    setTimeout(() => s.remove(), 1000);
+  }
+  if (tier === 'legendary') bigConfetti();
+}
+function renderGemCave() {
+  $('gemGrid').innerHTML = GEMS.map(([key, emoji, name, tier]) => {
+    const n = gems[key] || 0;
+    return `<div class="gem-card tier-${tier} ${n ? '' : 'none'}">
+      <span class="gem-emoji">${emoji}</span>
+      <span class="gem-name">${n ? name : '???'}</span>
+      <span class="gem-count">${n ? '× ' + n : 'Keep typing!'}</span>
+    </div>`;
+  }).join('');
+}
+
 function renderTrophies() {
   const shelf = $('trophyShelf');
   shelf.innerHTML = '<span class="shelf-label">My friends:</span>' +
@@ -586,7 +710,8 @@ function nextChallenge() {
     glowKey(letter);
     say(letter);
   } else {
-    const pool = mode === 'build' ? WORDS_EASY.concat(WORDS_MED) : (roundDone < 4 ? WORDS_EASY : WORDS_MED);
+    let pool = mode === 'build' ? WORDS_EASY.concat(WORDS_MED) : (roundDone < 4 ? WORDS_EASY : WORDS_MED);
+    if (Math.random() < 0.3) pool = WORDS_PERSONAL; // his own words show up often
     const [word, emoji] = pickFrom(pool);
     target = word; pos = 0;
     playArea.innerHTML = `
@@ -622,6 +747,7 @@ function handleLetter(letter) {
       const r = b.getBoundingClientRect();
       confetti(r.left + r.width / 2, r.top + r.height / 2, 22);
       addStar(r.left + r.width / 2, r.top);
+      if (Math.random() < 0.35) awardGem(r.left + r.width / 2, r.top + r.height / 2);
       bumpStreak();
       completeOne();
     } else {
@@ -642,14 +768,22 @@ function handleLetter(letter) {
       busy = true;
       $('wordBoxes').classList.add('word-done');
       sndWord();
-      sayWordSpelled(target);
+      if (target === 'RYLAN') {
+        say('R, Y, L, A, N. Rylan! You spelled your name!', 0.8);
+      } else {
+        sayWordSpelled(target);
+      }
       const r = $('wordBoxes').getBoundingClientRect();
       confetti(r.left + r.width / 2, r.top, 26);
       addStar(r.left + r.width / 2, r.top);
       if (mode === 'spell') addStar(); // spelling earns double
+      // every word digs up a gem; spelling solo boosts rare odds, his name guarantees rare+
+      awardGem(r.left + r.width / 2, r.top,
+               mode === 'spell' ? 2.5 : 1,
+               target === 'RYLAN' ? 'rare' : null);
       bumpStreak();
       glowKey(null);
-      completeOne(1400);
+      completeOne(1600);
     } else {
       const nextBox = document.querySelector(`.letter-box[data-i="${pos}"]`);
       nextBox.classList.add('current');
@@ -725,6 +859,15 @@ document.querySelectorAll('.mode-card').forEach(card => {
     nextChallenge();
   });
 });
+$('gemCaveBtn').addEventListener('click', () => {
+  renderGemCave();
+  menuEl.classList.remove('active');
+  $('gemcave').classList.add('active');
+});
+$('gemBackBtn').addEventListener('click', () => {
+  $('gemcave').classList.remove('active');
+  menuEl.classList.add('active');
+});
 $('backBtn').addEventListener('click', () => {
   mode = null;
   speechSynthesis.cancel();
@@ -754,6 +897,7 @@ window.addEventListener('keydown', (e) => {
   buildKeyboard();
   renderTrophies();
   $('starCount').textContent = stars;
+  $('gemCount').textContent = gemTotal();
 })();
 </script>
 </body>
