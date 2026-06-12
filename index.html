@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Typing Quest! 🎈</title>
+<title>Rylan's Typing Quest 🎈</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
@@ -90,6 +90,10 @@
     50%      { transform: translateY(-10px) rotate(3deg); }
   }
   @keyframes titleBounce { 0%,100% { transform: scale(1);} 50% { transform: scale(1.02);} }
+  .game-title .line2 {
+    display: block; font-size: .6em; letter-spacing: 4px; margin-top: 4px;
+    text-shadow: 0 4px 0 rgba(44,32,88,.18);
+  }
 
   .rainbow-1 { color: var(--candy-pink); }
   .rainbow-2 { color: var(--candy-orange); }
@@ -742,10 +746,11 @@ window.addEventListener('keydown', (e) => {
 /* ================= init ================= */
 (function init() {
   // rainbow title
-  const title = 'TYPING QUEST!';
-  $('gameTitle').innerHTML = title.split('').map((ch, i) =>
+  const rainbow = (text) => text.split('').map((ch, i) =>
     ch === ' ' ? ' ' : `<span class="rainbow-${(i % 6) + 1}">${ch}</span>`
   ).join('');
+  $('gameTitle').innerHTML = rainbow("RYLAN'S") +
+    `<span class="line2">${rainbow('TYPING QUEST!')}</span>`;
   buildKeyboard();
   renderTrophies();
   $('starCount').textContent = stars;
