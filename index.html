@@ -486,6 +486,7 @@ let pos = 0;              // index into target
 let roundDone = 0;        // items completed this round
 let streak = 0;
 let busy = false;         // ignore input during animations
+let rylanBonus = false;   // spelled his name this round → rare+ round gem
 let recentTargets = [];
 
 /* ================= dom ================= */
@@ -747,7 +748,6 @@ function handleLetter(letter) {
       const r = b.getBoundingClientRect();
       confetti(r.left + r.width / 2, r.top + r.height / 2, 22);
       addStar(r.left + r.width / 2, r.top);
-      if (Math.random() < 0.35) awardGem(r.left + r.width / 2, r.top + r.height / 2);
       bumpStreak();
       completeOne();
     } else {
@@ -777,10 +777,7 @@ function handleLetter(letter) {
       confetti(r.left + r.width / 2, r.top, 26);
       addStar(r.left + r.width / 2, r.top);
       if (mode === 'spell') addStar(); // spelling earns double
-      // every word digs up a gem; spelling solo boosts rare odds, his name guarantees rare+
-      awardGem(r.left + r.width / 2, r.top,
-               mode === 'spell' ? 2.5 : 1,
-               target === 'RYLAN' ? 'rare' : null);
+      if (target === 'RYLAN') rylanBonus = true; // his name upgrades the round's gem
       bumpStreak();
       glowKey(null);
       completeOne(1600);
@@ -836,6 +833,12 @@ function showCelebration() {
   sndFanfare();
   bigConfetti();
   say(praise.toLowerCase());
+  // milestone reward: finishing the round digs up ONE gem — harder modes dig rarer
+  const luck = mode === 'spell' ? 2.5 : mode === 'build' ? 1.5 : 1;
+  setTimeout(() => {
+    awardGem(innerWidth / 2, innerHeight * 0.32, luck, rylanBonus ? 'rare' : null);
+    rylanBonus = false;
+  }, 900);
 }
 $('celebrateBtn').addEventListener('click', () => {
   $('celebrate').classList.remove('show');
@@ -850,6 +853,7 @@ document.querySelectorAll('.mode-card').forEach(card => {
     audio(); // unlock audio on user gesture
     mode = card.dataset.mode;
     roundDone = 0;
+    rylanBonus = false;
     resetStreak();
     menuEl.classList.remove('active');
     gameEl.classList.add('active');
