@@ -305,30 +305,6 @@
   }
   .round-dots .dot.done { background: var(--candy-yellow); transform: scale(1.15); box-shadow: 0 0 8px rgba(255,225,77,.8); }
 
-  /* ---------- on-screen keyboard ---------- */
-  .kb { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 14px 10px 18px; width: 100%; }
-  .kb-row { display: flex; gap: 7px; justify-content: center; }
-  .kb-key {
-    width: clamp(34px, 5.8vw, 60px); height: clamp(42px, 7vh, 60px);
-    background: #fff; border-radius: 12px;
-    border-bottom: 5px solid #cfc8ea;
-    display: flex; align-items: center; justify-content: center;
-    font-family: 'Baloo 2', sans-serif; font-weight: 700;
-    font-size: clamp(17px, 3vh, 26px); color: var(--ink);
-    box-shadow: 0 3px 8px rgba(44,32,88,.1);
-    transition: all .1s ease;
-  }
-  .kb-key.glow {
-    background: linear-gradient(180deg, var(--candy-yellow), #ffd000);
-    border-bottom-color: #e0a800;
-    transform: scale(1.18); z-index: 2;
-    box-shadow: 0 0 18px rgba(255, 214, 0, .9);
-    animation: keyGlowPulse .8s ease-in-out infinite;
-  }
-  @keyframes keyGlowPulse { 0%,100% { transform: scale(1.18);} 50% { transform: scale(1.3);} }
-  .kb-key.pressed { transform: translateY(3px) scale(.94); border-bottom-width: 2px; background: #e8e3fa; }
-  .kb-key.pressed.glow { background: linear-gradient(180deg, var(--candy-green), #3cba49); border-bottom-color: #2c8c36; }
-
   /* ---------- celebration overlay ---------- */
   #celebrate {
     position: fixed; inset: 0; z-index: 50; display: none;
@@ -420,8 +396,6 @@
   </div>
 
   <div class="play-area" id="playArea"></div>
-
-  <div class="kb" id="keyboard"></div>
 </div>
 
 <!-- ============ CELEBRATION ============ -->
@@ -492,7 +466,7 @@ let recentTargets = [];
 /* ================= dom ================= */
 const $ = (id) => document.getElementById(id);
 const menuEl = $('menu'), gameEl = $('game'), playArea = $('playArea');
-const keyboardEl = $('keyboard'), hintBtn = $('hintBtn');
+const hintBtn = $('hintBtn');
 
 /* ================= audio (WebAudio bleeps) ================= */
 let actx = null;
@@ -643,27 +617,12 @@ function renderTrophies() {
     ).join('');
 }
 
-/* ================= keyboard ================= */
-const KB_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
-function buildKeyboard() {
-  keyboardEl.innerHTML = KB_ROWS.map(row =>
-    `<div class="kb-row">` +
-    row.split('').map(k => `<div class="kb-key" data-key="${k}">${k}</div>`).join('') +
-    `</div>`
-  ).join('');
-}
-function glowKey(letter) {
-  document.querySelectorAll('.kb-key.glow').forEach(k => k.classList.remove('glow'));
-  if (!letter) return;
-  const el = document.querySelector(`.kb-key[data-key="${letter}"]`);
-  if (el) el.classList.add('glow');
-}
-function flashKeyPressed(letter) {
-  const el = document.querySelector(`.kb-key[data-key="${letter}"]`);
-  if (!el) return;
-  el.classList.add('pressed');
-  setTimeout(() => el.classList.remove('pressed'), 160);
-}
+/* ================= keyboard =================
+   The on-screen keyboard was removed so Rylan finds the keys himself.
+   glowKey / flashKeyPressed are kept as no-ops since the game logic still
+   calls them; the spell-mode hint now guides by voice only. */
+function glowKey() {}
+function flashKeyPressed() {}
 
 /* ================= round dots ================= */
 function renderDots() {
@@ -898,7 +857,6 @@ window.addEventListener('keydown', (e) => {
   ).join('');
   $('gameTitle').innerHTML = rainbow("RYLAN'S") +
     `<span class="line2">${rainbow('TYPING QUEST!')}</span>`;
-  buildKeyboard();
   renderTrophies();
   $('starCount').textContent = stars;
   $('gemCount').textContent = gemTotal();
