@@ -300,7 +300,7 @@
     25% { transform: translateX(-14px) rotate(-4deg); }
     75% { transform: translateX(14px) rotate(4deg); }
   }
-  .balloon.popped { animation: balloonPop .35s ease forwards; }
+  .balloon.popped { animation: balloonPop .2s ease forwards; }
   @keyframes balloonPop {
     0%   { transform: scale(1); opacity: 1; }
     40%  { transform: scale(1.25); opacity: 1; }
@@ -827,7 +827,7 @@ function handleLetter(letter) {
       confetti(r.left + r.width / 2, r.top + r.height / 2, 22);
       addStar(r.left + r.width / 2, r.top);
       bumpStreak();
-      completeOne();
+      completeOne(280); // snappy — next letter appears almost immediately
     } else {
       wrongAnswer($('balloon'));
     }
