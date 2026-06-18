@@ -134,6 +134,19 @@
   .trophy-shelf .shelf-label { font-size: 16px; font-weight: 700; color: var(--ink); }
   .trophy-shelf .locked { filter: grayscale(1); opacity: .35; }
 
+  /* ---------- best-streak high score ---------- */
+  .best-pill {
+    display: flex; align-items: center; gap: 8px;
+    background: linear-gradient(180deg, #fff, #fff1dc);
+    border-radius: 999px; padding: 9px 24px;
+    font-size: 20px; font-weight: 800; color: var(--ink);
+    box-shadow: 0 4px 12px rgba(255,112,67,.28);
+  }
+  .best-pill .flame { font-size: 26px; animation: flameFlick 1.4s ease-in-out infinite; display: inline-block; }
+  .best-pill .best-num { color: #ff7043; min-width: 1ch; }
+  @keyframes flameFlick { 0%,100% { transform: scale(1) rotate(-3deg);} 50% { transform: scale(1.15) rotate(3deg);} }
+  .star-pill.best-hud { background: linear-gradient(180deg, #fff, #fff1dc); }
+
   .gem-cave-btn {
     border: none; cursor: pointer; font-family: inherit;
     background: linear-gradient(180deg, #6b54a8, #43326f); color: #fff;
@@ -181,6 +194,16 @@
   #gemToast.show { transform: translateX(-50%) scale(1); }
   #gemToast .toast-gem { font-size: 34px; vertical-align: -4px; }
 
+  /* new-best-streak banner */
+  #recordToast {
+    position: fixed; top: 21%; left: 50%; transform: translateX(-50%) scale(0); z-index: 71;
+    background: linear-gradient(180deg, #fff3d6, #ffd29a); color: var(--ink);
+    border-radius: 24px; padding: 12px 30px; font-size: 24px; font-weight: 800;
+    box-shadow: 0 12px 30px rgba(255,112,67,.45); pointer-events: none; white-space: nowrap;
+    transition: transform .25s cubic-bezier(.5,1.8,.5,1);
+  }
+  #recordToast.show { transform: translateX(-50%) scale(1); }
+
   /* ---------- HUD ---------- */
   .hud {
     width: 100%; max-width: 980px; display: flex; align-items: center;
@@ -212,6 +235,28 @@
     opacity: 0; transform: scale(.6); transition: all .25s cubic-bezier(.5,1.8,.5,1);
   }
   .streak-pill.show { opacity: 1; transform: scale(1); }
+
+  /* ---------- 10-minute session timer ---------- */
+  .hud-left { display: flex; align-items: center; gap: 10px; }
+  .timer-pill {
+    display: flex; align-items: center; gap: 6px;
+    background: #fff; border-radius: 999px; padding: 8px 16px;
+    font-size: 18px; font-weight: 800; color: var(--ink);
+    box-shadow: 0 4px 10px rgba(44,32,88,.15);
+    font-variant-numeric: tabular-nums;
+  }
+  .timer-pill.low {
+    background: linear-gradient(180deg, #ffd0d0, #ffb0b0); color: #c0303a;
+    animation: timerPulse 1s ease-in-out infinite;
+  }
+  @keyframes timerPulse { 0%,100% { transform: scale(1);} 50% { transform: scale(1.08);} }
+
+  #timesup {
+    position: fixed; inset: 0; z-index: 80; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(44,32,88,.55); backdrop-filter: blur(4px);
+  }
+  #timesup.show { display: flex; }
 
   /* ---------- play area ---------- */
   .play-area {
@@ -372,6 +417,9 @@
     </button>
   </div>
   <button class="gem-cave-btn" id="gemCaveBtn">💎 My Gem Cave</button>
+  <div class="best-pill" id="bestPill">
+    <span class="flame">🔥</span> Best Streak: <span class="best-num" id="bestStreakMenu">0</span>
+  </div>
   <div class="trophy-shelf" id="trophyShelf"></div>
 </div>
 
@@ -385,11 +433,15 @@
 <!-- ============ GAME ============ -->
 <div class="screen" id="game">
   <div class="hud">
-    <button class="hud-btn" id="backBtn">⬅ Back</button>
+    <div class="hud-left">
+      <button class="hud-btn" id="backBtn">⬅ Back</button>
+      <div class="timer-pill" id="timerPill" style="display:none;">⏱️ 10:00</div>
+    </div>
     <div class="round-dots" id="roundDots"></div>
     <div style="display:flex; gap:10px; align-items:center;">
       <div class="streak-pill" id="streakPill">🔥 0</div>
       <button class="hud-btn hint" id="hintBtn" style="display:none;">💡 Hint</button>
+      <div class="star-pill best-hud" title="Best streak — try to beat it!">🏅<span id="bestStreakHud">0</span></div>
       <div class="star-pill">💎<span id="gemCount">0</span></div>
       <div class="star-pill"><span class="star-icon">⭐</span><span id="starCount">0</span></div>
     </div>
@@ -408,7 +460,18 @@
   </div>
 </div>
 
+<!-- ============ TIME'S UP ============ -->
+<div id="timesup">
+  <div class="celebrate-card">
+    <span class="trophy">⏰</span>
+    <h2>Time's Up!</h2>
+    <p>Great job today, Rylan!<br>⭐ <span id="timesupStars">0</span> stars • 🔥 best streak <span id="timesupBest">0</span></p>
+    <button class="hud-btn" id="timesupBtn">Play Again 🔄</button>
+  </div>
+</div>
+
 <div id="gemToast"></div>
+<div id="recordToast"></div>
 <div id="fx"></div>
 
 <script>
@@ -450,10 +513,13 @@ const TROPHIES = [
   [0,'🐣'], [25,'🐥'], [50,'🐰'], [100,'🦊'], [150,'🦁'], [200,'🦄'], [300,'🐉'], [400,'👑'],
 ];
 const PRAISE = ['GREAT JOB!','AWESOME!','SUPER STAR!','YOU ROCK!','FANTASTIC!','WOW!'];
+const SESSION_MS = 10 * 60 * 1000; // 10-minute play session
 
 /* ================= state ================= */
 let stars = Number(localStorage.getItem('tq_stars') || 0);
 let gems = JSON.parse(localStorage.getItem('tq_gems') || '{}');
+let bestStreak = Number(localStorage.getItem('tq_best_streak') || 0); // saved high score
+let recordBeaten = false; // announce a new best only once per streak run
 let mode = null;          // 'pop' | 'build' | 'spell'
 let target = '';          // current word or letter
 let pos = 0;              // index into target
@@ -462,6 +528,8 @@ let streak = 0;
 let busy = false;         // ignore input during animations
 let rylanBonus = false;   // spelled his name this round → rare+ round gem
 let recentTargets = [];
+let timerStart = null;    // ms timestamp of his first letter this session
+let timerInterval = null; // 1s tick for the 10-minute timer
 
 /* ================= dom ================= */
 const $ = (id) => document.getElementById(id);
@@ -491,6 +559,7 @@ const sndPop   = () => { tone(880, 0, 0.07, 'triangle', 0.2); tone(1320, 0.05, 0
 const sndWord  = () => { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.09, 0.18, 'triangle', 0.16)); };
 const sndFanfare = () => { [523,659,784,1047,784,1047,1319].forEach((f,i)=>tone(f, i*0.12, 0.22, 'triangle', 0.17)); };
 const sndGem = () => { [1047,1319,1568,2093].forEach((f,i)=>tone(f, i*0.06, 0.14, 'sine', 0.14)); };
+const sndRecord = () => { [784,988,1175,1568,1976].forEach((f,i)=>tone(f, i*0.07, 0.16, 'triangle', 0.13)); };
 
 /* ================= speech ================= */
 let voice = null;
@@ -630,15 +699,38 @@ function renderDots() {
     (_, i) => `<div class="dot ${i < roundDone ? 'done' : ''}"></div>`).join('');
 }
 
-/* ================= streak ================= */
+/* ================= streak / high score ================= */
+function renderBest() {
+  const m = $('bestStreakMenu'); if (m) m.textContent = bestStreak;
+  const h = $('bestStreakHud');  if (h) h.textContent = bestStreak;
+}
+function announceRecord() {
+  const toast = $('recordToast');
+  toast.textContent = `🏅 NEW BEST STREAK! 🔥 ${bestStreak}`;
+  toast.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => toast.classList.remove('show'), 1900);
+  sndRecord();
+  confetti(innerWidth / 2, innerHeight * 0.22, 18);
+}
 function bumpStreak() {
   streak++;
   const pill = $('streakPill');
   pill.textContent = '🔥 ' + streak;
   pill.classList.toggle('show', streak >= 3);
+  if (streak > bestStreak) {            // new personal best — save it
+    bestStreak = streak;
+    localStorage.setItem('tq_best_streak', bestStreak);
+    renderBest();
+    if (!recordBeaten && bestStreak >= 3) { // celebrate beating it, once per run
+      recordBeaten = true;
+      announceRecord();
+    }
+  }
 }
 function resetStreak() {
   streak = 0;
+  recordBeaten = false;
   $('streakPill').classList.remove('show');
 }
 
@@ -693,9 +785,45 @@ function wordPrompt() {
 }
 function targetAsWord() { return target.charAt(0) + target.slice(1).toLowerCase(); }
 
+/* ================= 10-minute session timer ================= */
+function startSessionTimer() {
+  if (timerStart !== null) return;       // only the very first letter starts it
+  timerStart = Date.now();
+  $('timerPill').style.display = '';
+  tickTimer();
+  timerInterval = setInterval(tickTimer, 1000);
+}
+function tickTimer() {
+  const remain = Math.max(0, SESSION_MS - (Date.now() - timerStart));
+  const m = Math.floor(remain / 60000);
+  const s = Math.floor((remain % 60000) / 1000);
+  const pill = $('timerPill');
+  pill.textContent = `⏱️ ${m}:${String(s).padStart(2, '0')}`;
+  pill.classList.toggle('low', remain <= 60000); // last minute turns red
+  if (remain <= 0) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+    timesUp();
+  }
+}
+function timesUp() {
+  busy = true;
+  mode = null;
+  speechSynthesis.cancel();
+  $('celebrate').classList.remove('show');
+  $('timesupStars').textContent = stars;
+  $('timesupBest').textContent = bestStreak;
+  $('timesup').classList.add('show');
+  sndFanfare();
+  bigConfetti();
+  say("Time's up! Great job today, Rylan!");
+}
+$('timesupBtn').addEventListener('click', () => location.reload());
+
 /* ================= input handling ================= */
 function handleLetter(letter) {
   if (busy || !mode) return;
+  startSessionTimer(); // first letter of the session kicks off the 10-min timer
   flashKeyPressed(letter);
 
   if (mode === 'pop') {
@@ -785,7 +913,7 @@ hintBtn.addEventListener('click', () => {
 function showCelebration() {
   const praise = PRAISE[Math.floor(Math.random() * PRAISE.length)];
   $('celebrateTitle').textContent = praise;
-  $('celebrateSub').textContent = `You finished ${ROUND_LENGTH} in a row! ⭐ ${stars} stars!`;
+  $('celebrateSub').textContent = `You finished ${ROUND_LENGTH} in a row! ⭐ ${stars} stars • 🔥 best ${bestStreak}`;
   const unlocked = TROPHIES.filter(([n]) => stars >= n);
   $('celebrateEmoji').textContent = unlocked.length ? unlocked[unlocked.length - 1][1] : '🏆';
   $('celebrate').classList.add('show');
@@ -858,6 +986,7 @@ window.addEventListener('keydown', (e) => {
   $('gameTitle').innerHTML = rainbow("RYLAN'S") +
     `<span class="line2">${rainbow('TYPING QUEST!')}</span>`;
   renderTrophies();
+  renderBest();
   $('starCount').textContent = stars;
   $('gemCount').textContent = gemTotal();
 })();
