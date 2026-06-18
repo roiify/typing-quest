@@ -530,6 +530,8 @@ let rylanBonus = false;   // spelled his name this round → rare+ round gem
 let recentTargets = [];
 let timerStart = null;    // ms timestamp of his first letter this session
 let timerInterval = null; // 1s tick for the 10-minute timer
+let sessionOver = false;  // true once the 10 minutes are up — stops all play
+let autoContinueTimer = null; // rolls straight into the next round (continuous play)
 
 /* ================= dom ================= */
 const $ = (id) => document.getElementById(id);
@@ -748,6 +750,7 @@ function pickFrom(arr) {
 
 /* ================= modes ================= */
 function nextChallenge() {
+  if (sessionOver) return; // 10 minutes are up — don't start anything new
   busy = false;
   if (mode === 'pop') {
     const letter = pickFrom(LETTERS.map(l => [l]))[0];
@@ -807,8 +810,10 @@ function tickTimer() {
   }
 }
 function timesUp() {
+  sessionOver = true;
   busy = true;
   mode = null;
+  clearTimeout(autoContinueTimer);
   speechSynthesis.cancel();
   $('celebrate').classList.remove('show');
   $('timesupStars').textContent = stars;
@@ -910,7 +915,16 @@ hintBtn.addEventListener('click', () => {
 });
 
 /* ================= celebration ================= */
+function continueAfterRound() {
+  if (sessionOver) return;            // time's up takes over instead
+  clearTimeout(autoContinueTimer);
+  $('celebrate').classList.remove('show');
+  roundDone = 0;
+  renderDots();
+  nextChallenge();
+}
 function showCelebration() {
+  if (sessionOver) return;
   const praise = PRAISE[Math.floor(Math.random() * PRAISE.length)];
   $('celebrateTitle').textContent = praise;
   $('celebrateSub').textContent = `You finished ${ROUND_LENGTH} in a row! ⭐ ${stars} stars • 🔥 best ${bestStreak}`;
@@ -926,13 +940,10 @@ function showCelebration() {
     awardGem(innerWidth / 2, innerHeight * 0.32, luck, rylanBonus ? 'rare' : null);
     rylanBonus = false;
   }, 900);
+  // keep playing continuously — auto-roll into the next round (he can tap to skip the wait)
+  autoContinueTimer = setTimeout(continueAfterRound, 4000);
 }
-$('celebrateBtn').addEventListener('click', () => {
-  $('celebrate').classList.remove('show');
-  roundDone = 0;
-  renderDots();
-  nextChallenge();
-});
+$('celebrateBtn').addEventListener('click', continueAfterRound);
 
 /* ================= navigation ================= */
 document.querySelectorAll('.mode-card').forEach(card => {
