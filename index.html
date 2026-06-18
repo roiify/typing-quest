@@ -437,7 +437,7 @@
       <button class="hud-btn" id="backBtn">⬅ Back</button>
       <div class="timer-pill" id="timerPill" style="display:none;">⏱️ 10:00</div>
     </div>
-    <div class="round-dots" id="roundDots"></div>
+    <div class="star-pill" id="countPill" title="How many you typed!" style="display:none;">✏️<span id="doneCount">0</span></div>
     <div style="display:flex; gap:10px; align-items:center;">
       <div class="streak-pill" id="streakPill">🔥 0</div>
       <button class="hud-btn hint" id="hintBtn" style="display:none;">💡 Hint</button>
@@ -448,16 +448,6 @@
   </div>
 
   <div class="play-area" id="playArea"></div>
-</div>
-
-<!-- ============ CELEBRATION ============ -->
-<div id="celebrate">
-  <div class="celebrate-card">
-    <span class="trophy" id="celebrateEmoji">🏆</span>
-    <h2 id="celebrateTitle">AMAZING!</h2>
-    <p id="celebrateSub">You did it!</p>
-    <button class="hud-btn" id="celebrateBtn">Play More! 🎉</button>
-  </div>
 </div>
 
 <!-- ============ TIME'S UP ============ -->
@@ -523,15 +513,14 @@ let recordBeaten = false; // announce a new best only once per streak run
 let mode = null;          // 'pop' | 'build' | 'spell'
 let target = '';          // current word or letter
 let pos = 0;              // index into target
-let roundDone = 0;        // items completed this round
+let sessionDone = 0;      // total items completed this 10-minute session (no rounds)
 let streak = 0;
 let busy = false;         // ignore input during animations
-let rylanBonus = false;   // spelled his name this round → rare+ round gem
+let rylanBonus = false;   // spelled his name → next milestone gem is rare+
 let recentTargets = [];
 let timerStart = null;    // ms timestamp of his first letter this session
 let timerInterval = null; // 1s tick for the 10-minute timer
 let sessionOver = false;  // true once the 10 minutes are up — stops all play
-let autoContinueTimer = null; // rolls straight into the next round (continuous play)
 
 /* ================= dom ================= */
 const $ = (id) => document.getElementById(id);
@@ -695,10 +684,9 @@ function renderTrophies() {
 function glowKey() {}
 function flashKeyPressed() {}
 
-/* ================= round dots ================= */
-function renderDots() {
-  $('roundDots').innerHTML = Array.from({ length: ROUND_LENGTH },
-    (_, i) => `<div class="dot ${i < roundDone ? 'done' : ''}"></div>`).join('');
+/* ================= session count ================= */
+function renderCount() {
+  const c = $('doneCount'); if (c) c.textContent = sessionDone;
 }
 
 /* ================= streak / high score ================= */
@@ -765,7 +753,7 @@ function nextChallenge() {
     glowKey(letter);
     say(letter);
   } else {
-    let pool = mode === 'build' ? WORDS_EASY.concat(WORDS_MED) : (roundDone < 4 ? WORDS_EASY : WORDS_MED);
+    let pool = mode === 'build' ? WORDS_EASY.concat(WORDS_MED) : (sessionDone < 4 ? WORDS_EASY : WORDS_MED);
     if (Math.random() < 0.3) pool = WORDS_PERSONAL; // his own words show up often
     const [word, emoji] = pickFrom(pool);
     target = word; pos = 0;
@@ -813,9 +801,7 @@ function timesUp() {
   sessionOver = true;
   busy = true;
   mode = null;
-  clearTimeout(autoContinueTimer);
   speechSynthesis.cancel();
-  $('celebrate').classList.remove('show');
   $('timesupStars').textContent = stars;
   $('timesupBest').textContent = bestStreak;
   $('timesup').classList.add('show');
@@ -896,13 +882,11 @@ function wrongAnswer(el) {
 }
 
 function completeOne(delay = 900) {
-  roundDone++;
-  renderDots();
-  if (roundDone >= ROUND_LENGTH) {
-    setTimeout(showCelebration, delay);
-  } else {
-    setTimeout(nextChallenge, delay);
-  }
+  sessionDone++;
+  renderCount();
+  // every ROUND_LENGTH correct answers digs up a gem — but never stops play
+  if (sessionDone % ROUND_LENGTH === 0) milestoneReward();
+  setTimeout(nextChallenge, delay); // straight on to the next one, no round break
 }
 
 /* ================= hint (spell mode) ================= */
@@ -914,50 +898,31 @@ hintBtn.addEventListener('click', () => {
   setTimeout(() => { if (mode === 'spell') glowKey(null); }, 2500);
 });
 
-/* ================= celebration ================= */
-function continueAfterRound() {
-  if (sessionOver) return;            // time's up takes over instead
-  clearTimeout(autoContinueTimer);
-  $('celebrate').classList.remove('show');
-  roundDone = 0;
-  renderDots();
-  nextChallenge();
-}
-function showCelebration() {
+/* ================= milestone reward (seamless — no rounds, no stopping) ================= */
+function milestoneReward() {
   if (sessionOver) return;
-  const praise = PRAISE[Math.floor(Math.random() * PRAISE.length)];
-  $('celebrateTitle').textContent = praise;
-  $('celebrateSub').textContent = `You finished ${ROUND_LENGTH} in a row! ⭐ ${stars} stars • 🔥 best ${bestStreak}`;
-  const unlocked = TROPHIES.filter(([n]) => stars >= n);
-  $('celebrateEmoji').textContent = unlocked.length ? unlocked[unlocked.length - 1][1] : '🏆';
-  $('celebrate').classList.add('show');
+  // confetti + fanfare + a gem, all while the next challenge is already loading
+  const luck = mode === 'spell' ? 2.5 : mode === 'build' ? 1.5 : 1;
   sndFanfare();
   bigConfetti();
-  say(praise.toLowerCase());
-  // milestone reward: finishing the round digs up ONE gem — harder modes dig rarer
-  const luck = mode === 'spell' ? 2.5 : mode === 'build' ? 1.5 : 1;
-  setTimeout(() => {
-    awardGem(innerWidth / 2, innerHeight * 0.32, luck, rylanBonus ? 'rare' : null);
-    rylanBonus = false;
-  }, 900);
-  // keep playing continuously — auto-roll into the next round (he can tap to skip the wait)
-  autoContinueTimer = setTimeout(continueAfterRound, 4000);
+  awardGem(innerWidth / 2, innerHeight * 0.30, luck, rylanBonus ? 'rare' : null);
+  rylanBonus = false;
 }
-$('celebrateBtn').addEventListener('click', continueAfterRound);
 
 /* ================= navigation ================= */
 document.querySelectorAll('.mode-card').forEach(card => {
   card.addEventListener('click', () => {
     audio(); // unlock audio on user gesture
     mode = card.dataset.mode;
-    roundDone = 0;
+    sessionDone = 0;
     rylanBonus = false;
     resetStreak();
     menuEl.classList.remove('active');
     gameEl.classList.add('active');
     hintBtn.style.display = mode === 'spell' ? '' : 'none';
     $('starCount').textContent = stars;
-    renderDots();
+    $('countPill').style.display = '';
+    renderCount();
     nextChallenge();
   });
 });
