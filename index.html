@@ -258,6 +258,38 @@
   }
   #timesup.show { display: flex; }
 
+  #timesup .celebrate-card { max-width: min(92vw, 520px); }
+  .timesup-sub { font-size: 22px; font-weight: 700; color: #7a6fae; margin: 2px 0 4px; }
+
+  /* big "letters typed" trophy number */
+  .letters-trophy {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    background: linear-gradient(180deg, #fff7e6, #ffe8b8);
+    border-radius: 26px; padding: 14px 30px; margin: 14px auto 6px;
+    box-shadow: inset 0 0 0 4px rgba(255,179,64,.45), 0 8px 20px rgba(255,179,64,.3);
+  }
+  .letters-trophy .lt-num {
+    font-family: 'Baloo 2', sans-serif; font-weight: 800;
+    font-size: clamp(64px, 14vw, 96px); line-height: 1; color: #ff7043;
+    text-shadow: 0 5px 0 rgba(0,0,0,.12);
+    animation: ltPop .6s cubic-bezier(.5,1.8,.5,1);
+  }
+  @keyframes ltPop { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .letters-trophy .lt-label { font-size: 22px; font-weight: 800; color: var(--ink); letter-spacing: .5px; }
+
+  /* new-record banner */
+  .record-banner {
+    background: linear-gradient(180deg, #ffe14d, #ffb340);
+    color: var(--ink); font-weight: 800; font-size: 26px; line-height: 1.2;
+    border-radius: 20px; padding: 12px 24px; margin: 6px auto 2px;
+    box-shadow: 0 8px 22px rgba(255,179,64,.5);
+    animation: recordWobble 1s ease-in-out infinite;
+  }
+  @keyframes recordWobble { 0%,100% { transform: rotate(-2deg) scale(1);} 50% { transform: rotate(2deg) scale(1.04);} }
+  .record-banner .record-sub { font-size: 16px; font-weight: 700; color: #8a5a12; }
+  .timesup-best { font-size: 18px; font-weight: 700; color: #7a6fae; margin: 6px 0 2px; }
+  .timesup-extra { font-size: 17px; font-weight: 600; color: #9a8fce; margin: 8px 0 18px; }
+
   /* ---------- play area ---------- */
   .play-area {
     flex: 1; width: 100%; max-width: 980px;
@@ -453,9 +485,22 @@
 <!-- ============ TIME'S UP ============ -->
 <div id="timesup">
   <div class="celebrate-card">
-    <span class="trophy">⏰</span>
-    <h2>Time's Up!</h2>
-    <p>Great job today, Rylan!<br>⭐ <span id="timesupStars">0</span> stars • 🔥 best streak <span id="timesupBest">0</span></p>
+    <span class="trophy">🎉</span>
+    <h2 id="timesupTitle">Great Job, Rylan! 🎉</h2>
+    <p class="timesup-sub">Time's up — you did amazing today! 🌟</p>
+
+    <div class="letters-trophy">
+      <span class="lt-num" id="timesupLetters">0</span>
+      <span class="lt-label">letters typed!</span>
+    </div>
+
+    <div class="record-banner" id="timesupRecord" style="display:none;">
+      🏆 NEW RECORD! 🏆<br>
+      <span class="record-sub">Your best session ever!</span>
+    </div>
+    <p class="timesup-best" id="timesupBestLine">Your best so far: <span id="timesupBestSession">0</span> letters in one game</p>
+
+    <p class="timesup-extra">⭐ <span id="timesupStars">0</span> stars &nbsp;•&nbsp; 🔥 best streak <span id="timesupBest">0</span></p>
     <button class="hud-btn" id="timesupBtn">Play Again 🔄</button>
   </div>
 </div>
@@ -509,11 +554,13 @@ const SESSION_MS = 10 * 60 * 1000; // 10-minute play session
 let stars = Number(localStorage.getItem('tq_stars') || 0);
 let gems = JSON.parse(localStorage.getItem('tq_gems') || '{}');
 let bestStreak = Number(localStorage.getItem('tq_best_streak') || 0); // saved high score
+let bestSession = Number(localStorage.getItem('tq_best_session') || 0); // most letters typed in one 10-min session
 let recordBeaten = false; // announce a new best only once per streak run
 let mode = null;          // 'pop' | 'build' | 'spell'
 let target = '';          // current word or letter
 let pos = 0;              // index into target
 let sessionDone = 0;      // total items completed this 10-minute session (no rounds)
+let sessionLetters = 0;   // total correct letters typed this 10-minute session (the score he beats)
 let streak = 0;
 let busy = false;         // ignore input during animations
 let rylanBonus = false;   // spelled his name → next milestone gem is rare+
@@ -802,12 +849,41 @@ function timesUp() {
   busy = true;
   mode = null;
   speechSynthesis.cancel();
+
+  // did he beat his best-ever session? (first real session always counts as a record)
+  const newRecord = sessionLetters > bestSession && sessionLetters > 0;
+  if (newRecord) {
+    bestSession = sessionLetters;
+    localStorage.setItem('tq_best_session', bestSession);
+  }
+
+  $('timesupLetters').textContent = sessionLetters;
+  $('timesupBestSession').textContent = bestSession;
   $('timesupStars').textContent = stars;
   $('timesupBest').textContent = bestStreak;
+
+  const recordBanner = $('timesupRecord');
+  const bestLine = $('timesupBestLine');
+  if (newRecord) {
+    $('timesupTitle').textContent = 'NEW RECORD, Rylan! 🏆';
+    recordBanner.style.display = '';
+    bestLine.style.display = 'none';
+  } else {
+    $('timesupTitle').textContent = 'Great Job, Rylan! 🎉';
+    recordBanner.style.display = 'none';
+    bestLine.style.display = '';
+  }
+
   $('timesup').classList.add('show');
   sndFanfare();
   bigConfetti();
-  say("Time's up! Great job today, Rylan!");
+  if (newRecord) {
+    setTimeout(bigConfetti, 450);
+    setTimeout(sndRecord, 300);
+    say(`Time's up! You typed ${sessionLetters} letters! That is a brand new record! Amazing job, Rylan!`);
+  } else {
+    say(`Time's up! Great job today, Rylan! You typed ${sessionLetters} letters!`);
+  }
 }
 $('timesupBtn').addEventListener('click', () => location.reload());
 
@@ -820,6 +896,7 @@ function handleLetter(letter) {
   if (mode === 'pop') {
     if (letter === target) {
       busy = true;
+      sessionLetters++; // one balloon = one letter typed
       sndPop();
       const b = $('balloon');
       b.classList.add('popped');
@@ -836,6 +913,7 @@ function handleLetter(letter) {
 
   // word modes
   if (letter === target[pos]) {
+    sessionLetters++; // every correct letter in a word counts
     sndKey();
     const box = document.querySelector(`.letter-box[data-i="${pos}"]`);
     box.textContent = letter;
